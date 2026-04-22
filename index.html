@@ -111,7 +111,8 @@ td, th {
 
 <div class="name-bar">
   👤 <b>學生姓名：</b>
-  <input type="text" id="studentName" placeholder="請輸入姓名 (會顯示在截圖上)">
+  <input type="text" id="studentName" placeholder="請輸入姓名 (會顯示在截圖上)" oninput="saveProgress()">
+  <button class="danger" style="margin:0;padding:4px 10px;font-size:0.85em;" onclick="clearAllAndReload()">🗑️ 清除所有記錄</button>
   <span class="hint">完成後可按「複製文字」或「下載截圖」貼到 Padlet！</span>
 </div>
 
@@ -132,6 +133,49 @@ td, th {
 
 <div id="toast" class="toast"></div>
 
+/* ==================== 本地儲存 (localStorage) ==================== */
+const STORAGE_KEY = 'traceTable_progress_v1';
+
+function saveProgress() {
+  try {
+    const data = {
+      studentName: document.getElementById('studentName')?.value || '',
+      submissionLog: submissionLog,
+      currentMode: currentMode,
+      currentExample: currentExample,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn('儲存失敗:', e);
+  }
+}
+
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    console.warn('讀取失敗:', e);
+    return null;
+  }
+}
+
+function clearAllProgress() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (e) {}
+}
+
+window.clearAllAndReload = function() {
+  if (confirm('⚠️ 確定清除所有已儲存的作答記錄嗎？\n此動作無法復原！')) {
+    clearAllProgress();
+    location.reload();
+  }
+};
+  
+  
 <script>
 /* ==================================================================
    模式一：填充追蹤表
@@ -701,6 +745,7 @@ function confirmReset() {
     rec.headerScore = undefined;
     rec.revealed = false;
     rec.questionResults = {};
+    saveProgress(); 
     render();
     showToast(`已重置（重做第 ${rec.resetCount} 次）`);
   }
@@ -777,12 +822,14 @@ window.submitMode1 = function() {
   rec.total = total;
   rec.time = getTimeStr();
   showToast(`✅ 已提交！分數：${correct}/${total}`);
+  saveProgress();
   render();
 };
 
 window.revealMode1 = function() {
   const rec = ensureRecord();
   rec.revealed = true;
+  saveProgress();
   const inputs = document.querySelectorAll('input.cell');
   inputs.forEach(inp => {
     const ans = inp.dataset.ans || "";
@@ -924,12 +971,14 @@ window.submitMode2 = function() {
   rec.submitted = true;
   rec.time = getTimeStr();
   showToast(`✅ 已提交！分數：${rec.score}/${rec.total}`);
+  saveProgress();
   render();
 };
 
 window.revealMode2 = function() {
   const rec = ensureRecord();
   rec.revealed = true;
+  saveProgress();
   const ex = getCurrentExamples()[currentExample];
   const headerInputs = document.querySelectorAll('#buildTable input.header');
   const cellInputs = document.querySelectorAll('#buildTable input.cell');
@@ -1064,13 +1113,59 @@ window.submitQ3 = function(key, inputId) {
   rec.total = totalQs;
   rec.submitted = Object.keys(rec.questionResults).length === totalQs;
   
+  saveProgress();
   showToast(correct ? '✅ 正確！已鎖定' : '❌ 錯誤，已鎖定');
   render();
 };
 
-/* 初始化 */
-updateDropdown();
-render();
+/* ==================== 初始化：自動還原進度 ==================== */
+(function initWithRestore() {
+  const saved = loadProgress();
+  
+  if (saved && saved.submissionLog) {
+    // 還原提交記錄
+    Object.assign(submissionLog, saved.submissionLog);
+    
+    // 還原姓名
+    if (saved.studentName) {
+      document.getElementById('studentName').value = saved.studentName;
+    }
+    
+    // 還原模式與題號
+    if (saved.currentMode && [1,2,3].includes(saved.currentMode)) {
+      currentMode = saved.currentMode;
+      tabs.forEach(t => {
+        t.classList.toggle('active', parseInt(t.dataset.mode) === currentMode);
+      });
+    }
+    
+    updateDropdown();
+    
+    if (saved.currentExample !== undefined && saved.currentExample < getCurrentExamples().length) {
+      currentExample = saved.currentExample;
+      select.value = currentExample;
+    }
+    
+    render();
+    
+    // 顯示提示
+    const savedTime = saved.savedAt ? new Date(saved.savedAt).toLocaleString('zh-HK') : '未知';
+    const recordCount = Object.keys(saved.submissionLog).length;
+    if (recordCount > 0 || saved.studentName) {
+      setTimeout(() => {
+        showToast(`✅ 已還原上次進度（${savedTime}）`);
+      }, 400);
+    }
+  } else {
+    updateDropdown();
+    render();
+  }
+})();
+
+/* 切換模式/題目時也要記住位置 */
+const origSelectHandler = select.onchange;
+select.addEventListener('change', () => saveProgress());
+tabs.forEach(t => t.addEventListener('click', () => setTimeout(saveProgress, 50)));
 </script>
 
 </body>
