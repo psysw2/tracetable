@@ -17,8 +17,28 @@
   table { border-collapse: collapse; margin-top: 10px; }
   th, td { border: 1px solid #999; padding: 6px 10px; text-align: center; min-width: 50px; }
   th { background: #ffe0e0; color: #c00; }
-  input.cell { width: 65px; text-align: center; border: 2px dashed #2c7be5; background: #eef6ff; }
-  input.header { width: 85px; text-align: center; border: 2px dashed #c0392b; background: #fff3cd; font-weight: bold; color: #c0392b; }
+  input.cell { 
+  width: 90px; 
+  min-width: 90px;
+  text-align: center; 
+  border: 2px dashed #2c7be5; 
+  background: #eef6ff; 
+  padding: 4px 6px;
+  font-size: 1em;
+  box-sizing: border-box;
+  }
+  input.header { 
+  width: 110px; 
+  min-width: 110px;
+  text-align: center; 
+  border: 2px dashed #c0392b; 
+  background: #fff3cd; 
+  font-weight: bold; 
+  color: #c0392b; 
+  padding: 4px 6px;
+  font-size: 1em;
+  box-sizing: border-box;
+  }
   input.cell:disabled, input.header:disabled { cursor: not-allowed; opacity: 0.85; }
   /* 只在「查看答案」後才顯示對錯顏色 */
   input.cell.reveal-correct, input.header.reveal-correct { background: #c8f7c5 !important; border: 2px solid green !important; color: #222 !important; }
@@ -55,6 +75,33 @@
   .legend { font-size: 0.85em; color: #555; margin-top: 6px; }
   .legend span { display: inline-block; padding: 2px 8px; border-radius: 3px; margin-right: 6px; }
   .submitted-mark { color: #28a745; font-weight: bold; font-size: 1.1em; }
+  /* 防止文字被邊框裁走 */
+td, th { 
+  overflow: visible; 
+}
+
+/* 截圖專用：文字顯示格 (取代 input) */
+.capture-text {
+  display: inline-block;
+  min-width: 80px;
+  padding: 6px 10px;
+  border: 2px solid #2c7be5;
+  background: #eef6ff;
+  text-align: center;
+  font-family: Consolas, monospace;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.capture-text.header {
+  border-color: #c0392b;
+  background: #fff3cd;
+  color: #c0392b;
+  font-weight: bold;
+}
+.capture-text.correct { background: #c8f7c5; border-color: green; color: #222;}
+.capture-text.wrong { background: #ffd1d1; border-color: red; }
+.capture-text.empty { background: #f0f0f0; border-style: dashed; color: #999; }
+
 </style>
 </head>
 <body>
@@ -484,17 +531,57 @@ function shareButtonsHTML() {
 window.downloadScreenshot = function() {
   const target = document.getElementById('captureArea');
   if (!target) { showToast('找不到截圖區域'); return; }
-  if (typeof html2canvas === 'undefined') { showToast('截圖功能載入失敗，請檢查網絡'); return; }
+  if (typeof html2canvas === 'undefined') { showToast('截圖功能載入失敗'); return; }
   showToast('正在產生截圖...');
-  html2canvas(target, { backgroundColor: '#ffffff', scale: 2 }).then(canvas => {
+
+  html2canvas(target, { 
+    backgroundColor: '#ffffff', 
+    scale: 2,
+    // 🔑 關鍵：在克隆的 DOM 上把 input 換成 span，避免文字被裁
+    onclone: function(clonedDoc) {
+      const clonedArea = clonedDoc.getElementById('captureArea');
+      if (!clonedArea) return;
+      const inputs = clonedArea.querySelectorAll('input.cell, input.header');
+      inputs.forEach(inp => {
+        const span = clonedDoc.createElement('span');
+        span.className = 'capture-text';
+        
+        // 保留原本的顏色標記
+        if (inp.classList.contains('header')) span.classList.add('header');
+        if (inp.classList.contains('reveal-correct')) span.classList.add('correct');
+        if (inp.classList.contains('reveal-wrong')) span.classList.add('wrong');
+        
+        const val = inp.value.trim();
+        if (val === '') {
+          span.classList.add('empty');
+          span.textContent = '(空)';
+        } else {
+          span.textContent = val;
+        }
+        inp.parentNode.replaceChild(span, inp);
+      });
+      
+      // 問題回答的 input (模式三) 也替換
+      const qInputs = clonedArea.querySelectorAll('.q-block input[type=text]');
+      qInputs.forEach(inp => {
+        const span = clonedDoc.createElement('span');
+        span.style.cssText = 'display:inline-block;min-width:220px;padding:6px 10px;border:1px solid #999;background:#f9f9f9;border-radius:3px;';
+        span.textContent = inp.value.trim() || '(未答)';
+        inp.parentNode.replaceChild(span, inp);
+      });
+    }
+  }).then(canvas => {
     const name = document.getElementById('studentName').value.trim() || 'student';
     const ex = getCurrentExamples()[currentExample];
     const filename = `追蹤表_${name}_${ex.title}.png`.replace(/[\\/:*?"<>|]/g,'_');
     const link = document.createElement('a');
-    link.download = filename; link.href = canvas.toDataURL('image/png');
+    link.download = filename; 
+    link.href = canvas.toDataURL('image/png');
     link.click();
-    showToast('✅ 截圖已下載！可上傳至 Padlet');
-  }).catch(err => { showToast('截圖失敗：' + err.message); });
+    showToast('✅ 截圖已下載！');
+  }).catch(err => { 
+    showToast('截圖失敗：' + err.message); 
+  });
 };
 
 /* ================ 複製文字 ================ */
