@@ -18,20 +18,26 @@
   th, td { border: 1px solid #999; padding: 6px 10px; text-align: center; min-width: 50px; }
   th { background: #ffe0e0; color: #c00; }
   input.cell { width: 65px; text-align: center; border: 2px dashed #2c7be5; background: #eef6ff; }
-  input.cell.correct { background: #c8f7c5; border: 2px solid green; }
-  input.cell.wrong { background: #ffd1d1; border: 2px solid red; }
+  input.header { width: 85px; text-align: center; border: 2px dashed #c0392b; background: #fff3cd; font-weight: bold; color: #c0392b; }
+  input.cell:disabled, input.header:disabled { cursor: not-allowed; opacity: 0.85; }
+  /* 只在「查看答案」後才顯示對錯顏色 */
+  input.cell.reveal-correct, input.header.reveal-correct { background: #c8f7c5 !important; border: 2px solid green !important; color: #222 !important; }
+  input.cell.reveal-wrong, input.header.reveal-wrong { background: #ffd1d1 !important; border: 2px solid red !important; }
   button { background: #2c7be5; color: white; padding: 8px 14px; border: none; border-radius: 5px; cursor: pointer; margin-right: 6px; margin-top: 10px; font-size: 0.95em; }
   button:hover { background: #1a5bb8; }
+  button:disabled { background: #aaa; cursor: not-allowed; }
   button.secondary { background: #6c757d; }
+  button.danger { background: #c0392b; }
   button.action { background: #28a745; }
   button.action:hover { background: #1e7e34; }
   button.action2 { background: #e67e22; }
   button.action2:hover { background: #ca6510; }
+  button.reveal { background: #8e44ad; }
   .feedback { margin-top: 10px; font-weight: bold; }
   .ok { color: green; }
   .bad { color: red; }
   select { padding: 6px; }
-  .q-block { margin-top: 14px; padding: 10px; background: #fafafa; border-left: 3px solid #f39c12; }
+  .q-block { margin-top: 14px; padding: 10px; background: #fafafa; border-left: 3px solid #f39c12; position: relative; }
   .q-block input[type=text] { padding: 6px; width: 220px; }
   .hint { font-size: 0.9em; color: #555; }
   label { display: block; margin: 5px 0; }
@@ -39,8 +45,16 @@
   .name-bar { background: #fff7e6; border: 1px solid #f0c787; padding: 10px; border-radius: 6px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .name-bar input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 180px; }
   .capture-header { margin-bottom: 10px; padding: 8px; background: #f0f8ff; border-radius: 4px; font-size: 0.95em; }
+  .submit-badge { margin: 10px 0; padding: 12px; border-radius: 6px; font-weight: bold; border: 2px solid; }
+  .submit-badge.success { background: #d4edda; border-color: #28a745; color: #155724; }
+  .submit-badge.partial { background: #fff3cd; border-color: #ffc107; color: #856404; }
+  .submit-badge.fail { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+  .warn-banner { background: #ffe5e5; border: 2px dashed #c0392b; padding: 8px 12px; border-radius: 6px; margin: 10px 0; color: #c0392b; font-weight: bold; font-size: 0.95em; }
   .toast { position: fixed; top: 20px; right: 20px; background: #333; color: white; padding: 12px 20px; border-radius: 6px; opacity: 0; transition: opacity 0.3s; z-index: 1000; }
   .toast.show { opacity: 1; }
+  .legend { font-size: 0.85em; color: #555; margin-top: 6px; }
+  .legend span { display: inline-block; padding: 2px 8px; border-radius: 3px; margin-right: 6px; }
+  .submitted-mark { color: #28a745; font-weight: bold; font-size: 1.1em; }
 </style>
 </head>
 <body>
@@ -62,6 +76,7 @@
 
 <div class="container">
   <div id="modeDesc" class="mode-desc"></div>
+  <div class="warn-banner">⚠️ 重要：每題<u>只能提交一次</u>！提交後分數會鎖定，請先仔細檢查所有答案才按「提交」。</div>
   <label>選擇例子：
     <select id="exampleSelect"></select>
   </label>
@@ -162,7 +177,7 @@ M ← 1
 ];
 
 /* ==================================================================
-   模式二：由零建立追蹤表
+   模式二：由零建立追蹤表 (連欄位標題都要填)
 ================================================================== */
 const examplesMode2 = [
   {
@@ -178,6 +193,7 @@ Z ← 3
 直至 Z > 50
 輸出 X, Y, Z`,
     columns: ["X", "Y", "Z", "Z > 50", "輸出"],
+    columnAlts: [["x"], ["y"], ["z"], ["z>50","z > 50"], ["輸出","output"]],
     rows: [
       ["1", "2", "3", "", ""],
       ["5", "8", "13", "False", ""],
@@ -195,6 +211,7 @@ step ← 0
     step ← step + 1
 輸出 N, step`,
     columns: ["N > 10", "N", "step"],
+    columnAlts: [["n>10","n > 10"], ["n"], ["step"]],
     rows: [
       ["", "50", "0"],
       ["True", "43", "1"],
@@ -216,6 +233,7 @@ n ← 1
     n ← n + 2
 輸出 result`,
     columns: ["n <= 7", "result", "n"],
+    columnAlts: [["n<=7","n <= 7"], ["result"], ["n"]],
     rows: [
       ["", "1", "1"],
       ["True", "1", "3"],
@@ -235,6 +253,7 @@ Q ← 0
     P ← P - 1
 輸出 P, Q`,
     columns: ["P > Q", "P", "Q"],
+    columnAlts: [["p>q","p > q"], ["p"], ["q"]],
     rows: [
       ["", "10", "0"],
       ["True", "9", "3"],
@@ -362,13 +381,25 @@ count ← 0
 
 /* ================ 主控制 ================ */
 const modeData = {
-  1: { examples: examplesMode1, desc: "請在藍色格子填寫正確答案，然後按「批改」。" },
-  2: { examples: examplesMode2, desc: "請根據偽代碼，由零開始填寫整個追蹤表（每一格都要填）。" },
-  3: { examples: examplesMode3, desc: "參考完整追蹤表，回答下方各條問題。" }
+  1: { examples: examplesMode1, desc: "請在藍色格子填寫正確答案。填滿後按「提交」（只能提交一次！）。" },
+  2: { examples: examplesMode2, desc: "請根據偽代碼，由零開始建立整個追蹤表——包括【黃色的欄位標題】和【藍色的每一格數值】！填滿後按「提交」（只能提交一次！）。" },
+  3: { examples: examplesMode3, desc: "參考完整追蹤表，回答下方各條問題。每題只能提交一次！" }
 };
 
 let currentMode = 1;
 let currentExample = 0;
+
+/* ★ 提交記錄：每個 (mode, example) 只能提交一次 
+   結構: submissionLog["mode-example"] = { submitted, score, total, headerScore, headerTotal, cellScore, cellTotal, time, revealed, resetCount, questionResults } */
+const submissionLog = {};
+function keyOf(mode, ex) { return `${mode}-${ex}`; }
+function getCurrentKey() { return keyOf(currentMode, currentExample); }
+function getSubmission() { return submissionLog[getCurrentKey()]; }
+function ensureRecord() {
+  const k = getCurrentKey();
+  if (!submissionLog[k]) submissionLog[k] = { submitted:false, resetCount:0, questionResults:{} };
+  return submissionLog[k];
+}
 
 const tabs = document.querySelectorAll('.tab');
 const select = document.getElementById('exampleSelect');
@@ -378,17 +409,28 @@ const modeDesc = document.getElementById('modeDesc');
 function getCurrentExamples() { return modeData[currentMode].examples; }
 
 function normalize(s) {
-  return (s || "").toString().replace(/\s+/g, ' ').trim().toLowerCase();
+  return (s || "").toString().replace(/\s+/g, '').trim().toLowerCase();
 }
 function isEqual(userVal, answer) {
   return normalize(userVal) === normalize(answer);
+}
+function isHeaderCorrect(userVal, primary, alts) {
+  const u = normalize(userVal);
+  if (u === normalize(primary)) return true;
+  if (Array.isArray(alts)) return alts.some(a => u === normalize(a));
+  return false;
 }
 
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function getTimeStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
 }
 
 function updateDropdown() {
@@ -423,10 +465,13 @@ function render() {
 /* ================ 共用：截圖標題 & 分享按鈕 ================ */
 function captureHeaderHTML(ex) {
   const name = document.getElementById('studentName').value.trim() || "(未填姓名)";
-  const now = new Date();
-  const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const rec = getSubmission();
+  const submittedInfo = (rec && rec.submitted)
+    ? `<br>✅ <b>已提交</b> &nbsp;|&nbsp; 分數：<b>${rec.score}/${rec.total}</b> (${Math.round(rec.score/rec.total*100)}%) &nbsp;|&nbsp; 提交時間：${rec.time}${rec.resetCount>0?` &nbsp;|&nbsp; <span style="color:#c0392b;">重做次數：${rec.resetCount}</span>`:''}${rec.revealed?` &nbsp;|&nbsp; <span style="color:#8e44ad;">已查看答案</span>`:''}`
+    : `<br>⏳ <b>未提交</b>`;
   return `<div class="capture-header">
-    👤 <b>學生：</b>${name} &nbsp;|&nbsp; 📅 ${date} &nbsp;|&nbsp; 📚 ${ex.title}
+    👤 <b>學生：</b>${name} &nbsp;|&nbsp; 📅 ${getTimeStr()} &nbsp;|&nbsp; 📚 ${ex.title}
+    ${submittedInfo}
   </div>`;
 }
 
@@ -435,46 +480,46 @@ function shareButtonsHTML() {
           <button class="action2" onclick="copyAsText()">📋 複製文字</button>`;
 }
 
-/* ================ 截圖（共用） ================ */
+/* ================ 截圖 ================ */
 window.downloadScreenshot = function() {
   const target = document.getElementById('captureArea');
   if (!target) { showToast('找不到截圖區域'); return; }
-  if (typeof html2canvas === 'undefined') {
-    showToast('截圖功能載入失敗，請檢查網絡');
-    return;
-  }
+  if (typeof html2canvas === 'undefined') { showToast('截圖功能載入失敗，請檢查網絡'); return; }
   showToast('正在產生截圖...');
   html2canvas(target, { backgroundColor: '#ffffff', scale: 2 }).then(canvas => {
     const name = document.getElementById('studentName').value.trim() || 'student';
     const ex = getCurrentExamples()[currentExample];
     const filename = `追蹤表_${name}_${ex.title}.png`.replace(/[\\/:*?"<>|]/g,'_');
     const link = document.createElement('a');
-    link.download = filename;
-    link.href = canvas.toDataURL('image/png');
+    link.download = filename; link.href = canvas.toDataURL('image/png');
     link.click();
     showToast('✅ 截圖已下載！可上傳至 Padlet');
-  }).catch(err => {
-    showToast('截圖失敗：' + err.message);
-  });
+  }).catch(err => { showToast('截圖失敗：' + err.message); });
 };
 
-/* ================ 複製成文字（共用） ================ */
+/* ================ 複製文字 ================ */
 window.copyAsText = function() {
   const ex = getCurrentExamples()[currentExample];
   const name = document.getElementById('studentName').value.trim() || "(未填姓名)";
-  const now = new Date();
-  const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const rec = getSubmission();
   
   let text = `📘 追蹤表作業\n`;
-  text += `學生：${name}\n日期：${date}\n題目：${ex.title}\n`;
-  text += `-----------------------------------\n`;
-  text += `偽代碼：\n${ex.code}\n`;
+  text += `學生：${name}\n題目：${ex.title}\n`;
+  text += `匯出時間：${getTimeStr()}\n`;
+  if (rec && rec.submitted) {
+    text += `✅ 已提交 | 分數：${rec.score}/${rec.total} (${Math.round(rec.score/rec.total*100)}%)\n`;
+    text += `提交時間：${rec.time}\n`;
+    if (rec.resetCount > 0) text += `⚠️ 重做次數：${rec.resetCount}\n`;
+    if (rec.revealed) text += `🔍 已查看過正確答案\n`;
+  } else {
+    text += `⏳ 未提交\n`;
+  }
+  text += `-----------------------------------\n偽代碼：\n${ex.code}\n`;
   text += `-----------------------------------\n`;
   
-  // 建立表格文字
   const table = document.querySelector('#captureArea table');
   if (table) {
-    text += `我的追蹤表：\n`;
+    text += `追蹤表：\n`;
     const rows = table.querySelectorAll('tr');
     rows.forEach(row => {
       const cells = row.querySelectorAll('th, td');
@@ -487,47 +532,66 @@ window.copyAsText = function() {
     });
   }
   
-  // 模式三額外收集答案
-  if (currentMode === 3) {
+  if (currentMode === 3 && rec && rec.questionResults) {
     text += `-----------------------------------\n我的作答：\n`;
-    const qOut = document.getElementById('qOut');
-    if (qOut) text += `Q1 輸出：${qOut.value || '(未作答)'}\n`;
-    const qP = document.getElementById('qPurpose');
-    if (qP) text += `Q2 目的：${qP.value || '(未作答)'}\n`;
-    ex.questions.forEach((qq, i) => {
-      const el = document.getElementById('q'+i);
-      if (el) text += `Q${i+3} ${qq.q} → ${el.value || '(未作答)'}\n`;
+    Object.keys(rec.questionResults).forEach(qk => {
+      const q = rec.questionResults[qk];
+      text += `${qk}: ${q.answer || '(未答)'} → ${q.correct ? '✔ 正確' : '✘ 錯誤'}\n`;
     });
   }
   
-  // 複製到剪貼簿
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => {
-      showToast('✅ 已複製！可貼到 Padlet');
-    }).catch(() => fallbackCopy(text));
-  } else {
-    fallbackCopy(text);
-  }
+    navigator.clipboard.writeText(text).then(() => showToast('✅ 已複製！可貼到 Padlet')).catch(() => fallbackCopy(text));
+  } else fallbackCopy(text);
 };
 
 function fallbackCopy(text) {
   const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed'; ta.style.left = '-9999px';
-  document.body.appendChild(ta);
-  ta.select();
-  try {
-    document.execCommand('copy');
-    showToast('✅ 已複製！可貼到 Padlet');
-  } catch(e) {
-    showToast('複製失敗，請手動選取');
-  }
+  ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); showToast('✅ 已複製！可貼到 Padlet'); }
+  catch(e) { showToast('複製失敗，請手動選取'); }
   document.body.removeChild(ta);
 }
 
+/* ================ 提交徽章 & 控制按鈕 HTML ================ */
+function submitBadgeHTML(rec, total) {
+  if (!rec || !rec.submitted) return '';
+  const pct = Math.round(rec.score/rec.total*100);
+  const cls = pct === 100 ? 'success' : (pct >= 60 ? 'partial' : 'fail');
+  const emoji = pct === 100 ? '🎉' : (pct >= 60 ? '👍' : '💪');
+  let extra = '';
+  if (rec.headerScore !== undefined) {
+    extra = `<br><span style="font-weight:normal;">欄位標題：${rec.headerScore}/${rec.headerTotal} &nbsp;|&nbsp; 資料格：${rec.cellScore}/${rec.cellTotal}</span>`;
+  }
+  return `<div class="submit-badge ${cls}">
+    ${emoji} 已提交 — 分數：${rec.score}/${rec.total} (${pct}%) &nbsp;|&nbsp; 提交時間：${rec.time}
+    ${rec.resetCount>0?`<br><span style="color:#c0392b;font-weight:normal;">⚠️ 重做次數：${rec.resetCount}（會顯示在截圖上）</span>`:''}
+    ${extra}
+  </div>`;
+}
+
+function confirmReset() {
+  if (confirm('⚠️ 重新開始會清空所有答案！\n重做次數會被記錄並顯示在截圖上，老師會知道你重做過。\n\n確定重新開始嗎？')) {
+    const rec = ensureRecord();
+    rec.resetCount = (rec.resetCount || 0) + 1;
+    rec.submitted = false;
+    rec.score = null; rec.total = null;
+    rec.headerScore = undefined;
+    rec.revealed = false;
+    rec.questionResults = {};
+    render();
+    showToast(`已重置（重做第 ${rec.resetCount} 次）`);
+  }
+}
+window.confirmReset = confirmReset;
+
 /* ================ 模式一 ================ */
 function renderMode1(ex) {
-  let html = `<div id="captureArea">${captureHeaderHTML(ex)}<div class="row">
+  const rec = ensureRecord();
+  let html = `<div id="captureArea">${captureHeaderHTML(ex)}`;
+  html += submitBadgeHTML(rec, ex.blanks.length);
+  html += `<div class="row">
     <div class="col"><h3>偽代碼</h3><pre>${ex.code}</pre></div>
     <div class="col"><h3>追蹤表 (請填寫藍色格)</h3>`;
   html += '<table><tr>';
@@ -538,7 +602,10 @@ function renderMode1(ex) {
     row.forEach((cell, c) => {
       const isBlank = ex.blanks.some(b => b[0]===r && b[1]===c);
       if (isBlank) {
-        html += `<td><input class="cell" data-r="${r}" data-c="${c}" data-ans="${cell}"></td>`;
+        const ansVal = cell;
+        const stuVal = (rec.answers && rec.answers[`${r}-${c}`]) || '';
+        const disabled = rec.submitted ? 'disabled' : '';
+        html += `<td><input class="cell" data-r="${r}" data-c="${c}" data-ans="${ansVal}" value="${stuVal}" ${disabled}></td>`;
       } else {
         html += `<td>${cell}</td>`;
       }
@@ -546,80 +613,251 @@ function renderMode1(ex) {
     html += '</tr>';
   });
   html += '</table></div></div></div>';
-  html += `<div style="margin-top:14px;">
-      <button onclick="checkMode1()">✅ 批改</button>
-      <button class="secondary" onclick="render()">重設</button>
-      ${shareButtonsHTML()}
-      <div id="fb1" class="feedback"></div>
-   </div>`;
+  
+  // 控制按鈕
+  html += `<div style="margin-top:14px;">`;
+  if (!rec.submitted) {
+    html += `<button onclick="submitMode1()">🔒 提交（只有一次機會）</button>
+             <button class="secondary" onclick="confirmReset()">清空重填</button>`;
+  } else {
+    html += `<button disabled>🔒 已提交，不能再改</button>
+             <button class="danger" onclick="confirmReset()">⚠️ 重新開始（會記錄）</button>`;
+    if (!rec.revealed) {
+      html += `<button class="reveal" onclick="revealMode1()">🔍 查看正確答案（僅供學習，不影響分數）</button>`;
+    }
+  }
+  html += shareButtonsHTML();
+  html += `<div id="fb1" class="feedback"></div></div>`;
   content.innerHTML = html;
 }
 
-window.checkMode1 = function() {
+window.submitMode1 = function() {
   const inputs = document.querySelectorAll('input.cell');
+  // 驗證必須全部填滿
+  for (const inp of inputs) {
+    if (inp.value.trim() === '') {
+      showToast('⚠️ 請先填滿所有藍色格子才能提交！');
+      return;
+    }
+  }
+  if (!confirm('確定提交？\n提交後不能再修改答案！')) return;
+  
+  const rec = ensureRecord();
   let correct = 0, total = inputs.length;
+  rec.answers = {};
+  inputs.forEach(inp => {
+    const r = inp.dataset.r, c = inp.dataset.c;
+    rec.answers[`${r}-${c}`] = inp.value;
+    const ans = inp.dataset.ans || "";
+    if (isEqual(inp.value, ans)) correct++;
+  });
+  rec.submitted = true;
+  rec.score = correct;
+  rec.total = total;
+  rec.time = getTimeStr();
+  showToast(`✅ 已提交！分數：${correct}/${total}`);
+  render();
+};
+
+window.revealMode1 = function() {
+  const rec = ensureRecord();
+  rec.revealed = true;
+  const inputs = document.querySelectorAll('input.cell');
   inputs.forEach(inp => {
     const ans = inp.dataset.ans || "";
     if (isEqual(inp.value, ans)) {
-      inp.classList.add('correct'); inp.classList.remove('wrong'); correct++;
+      inp.classList.add('reveal-correct');
     } else {
-      inp.classList.add('wrong'); inp.classList.remove('correct');
+      inp.classList.add('reveal-wrong');
+      inp.title = `正確答案：${ans}`;
+      // 顯示正確答案在紅格旁邊
+      if (!inp.nextSibling || !inp.nextSibling.classList || !inp.nextSibling.classList.contains('ans-tag')) {
+        const tag = document.createElement('div');
+        tag.className = 'ans-tag';
+        tag.style.cssText = 'font-size:0.75em;color:green;margin-top:2px;';
+        tag.textContent = '✓ ' + ans;
+        inp.parentNode.appendChild(tag);
+      }
     }
   });
-  const fb = document.getElementById('fb1');
-  fb.innerHTML = `答對 ${correct} / ${total} 格` + (correct===total ? ' 🎉 完全正確！' : ' — 紅色格子是錯的，請重試。');
-  fb.className = 'feedback ' + (correct===total ? 'ok' : 'bad');
+  showToast('已顯示正確答案（供學習，分數不變）');
 };
 
 /* ================ 模式二 ================ */
 function renderMode2(ex) {
-  let html = `<div id="captureArea">${captureHeaderHTML(ex)}<div class="row">
+  const rec = ensureRecord();
+  const totalCells = ex.columns.length + ex.rows.length * ex.columns.length;
+  let html = `<div id="captureArea">${captureHeaderHTML(ex)}`;
+  html += submitBadgeHTML(rec, totalCells);
+  html += `<div class="row">
     <div class="col"><h3>偽代碼</h3><pre>${ex.code}</pre>
-    <p class="hint">提示：欄位已為你準備好。請逐行填寫每一步變量的值。(空格可留空)</p>
+    <p class="hint">💡 提示：<br>
+    • 先從偽代碼找出所有<b>變量</b>和<b>條件判斷</b>，填入黃色欄位標題<br>
+    • 然後按執行順序，逐行填寫藍色格<br>
+    • 欄位順序可不同，但名稱要正確</p>
+    <div class="legend">
+      <span style="background:#fff3cd;border:1px dashed #c0392b;">黃色 = 欄位標題</span>
+      <span style="background:#eef6ff;border:1px dashed #2c7be5;">藍色 = 資料格</span>
     </div>
-    <div class="col"><h3>請建立追蹤表</h3>`;
+    </div>
+    <div class="col"><h3>請建立完整追蹤表</h3>`;
   html += '<table id="buildTable"><tr>';
-  ex.columns.forEach(c => html += `<th>${c}</th>`);
+  const disabled = rec.submitted ? 'disabled' : '';
+  for (let c = 0; c < ex.columns.length; c++) {
+    const stuVal = (rec.headers && rec.headers[c]) || '';
+    html += `<th><input class="header" data-c="${c}" placeholder="?" value="${stuVal}" ${disabled}></th>`;
+  }
   html += '</tr>';
   for (let r = 0; r < ex.rows.length; r++) {
     html += '<tr>';
     for (let c = 0; c < ex.columns.length; c++) {
-      html += `<td><input class="cell" data-r="${r}" data-c="${c}"></td>`;
+      const stuVal = (rec.cells && rec.cells[`${r}-${c}`]) || '';
+      html += `<td><input class="cell" data-r="${r}" data-c="${c}" value="${stuVal}" ${disabled}></td>`;
     }
     html += '</tr>';
   }
-  html += '</table></div></div></div>';
-  html += `<div style="margin-top:14px;">
-      <button onclick="checkMode2()">✅ 批改</button>
-      <button class="secondary" onclick="render()">清空</button>
-      ${shareButtonsHTML()}
-      <div id="fb2" class="feedback"></div>
-  </div>`;
+  html += '</table>';
+  html += `<p class="hint">欄位數：${ex.columns.length}</p>`;
+  html += '</div></div></div>';
+  
+  html += `<div style="margin-top:14px;">`;
+  if (!rec.submitted) {
+    html += `<button onclick="submitMode2()">🔒 提交（只有一次機會）</button>
+             <button class="secondary" onclick="confirmReset()">清空重填</button>`;
+  } else {
+    html += `<button disabled>🔒 已提交，不能再改</button>
+             <button class="danger" onclick="confirmReset()">⚠️ 重新開始（會記錄）</button>`;
+    if (!rec.revealed) {
+      html += `<button class="reveal" onclick="revealMode2()">🔍 查看正確答案</button>`;
+    }
+  }
+  html += shareButtonsHTML();
+  html += `<div id="fb2" class="feedback"></div></div>`;
   content.innerHTML = html;
 }
 
-window.checkMode2 = function() {
+window.submitMode2 = function() {
+  const headerInputs = document.querySelectorAll('#buildTable input.header');
+  const cellInputs = document.querySelectorAll('#buildTable input.cell');
+  
+  // 必須全部欄位標題填滿（資料格可容許空值，因為有些例子有空白）
+  for (const inp of headerInputs) {
+    if (inp.value.trim() === '') {
+      showToast('⚠️ 請先填寫所有黃色欄位標題！');
+      return;
+    }
+  }
+  // 檢查：至少每行的前幾格要有內容 (避免亂按)
+  let emptyCount = 0;
+  cellInputs.forEach(inp => { if (inp.value.trim() === '') emptyCount++; });
+  if (emptyCount > cellInputs.length * 0.5) {
+    showToast('⚠️ 太多空格未填，請先完成追蹤表！');
+    return;
+  }
+  if (!confirm('確定提交？\n提交後不能再修改答案！')) return;
+  
   const ex = getCurrentExamples()[currentExample];
-  const inputs = document.querySelectorAll('#buildTable input.cell');
-  let correct = 0, total = 0;
-  inputs.forEach(inp => {
-    const r = +inp.dataset.r, c = +inp.dataset.c;
-    const ans = ex.rows[r][c] || "";
-    total++;
-    if (isEqual(inp.value, ans)) {
-      inp.classList.add('correct'); inp.classList.remove('wrong'); correct++;
+  const rec = ensureRecord();
+  rec.headers = {};
+  rec.cells = {};
+  
+  // 對應學生欄位到正解欄位
+  const mapping = [];
+  const usedCorrectCols = new Set();
+  let headerCorrect = 0;
+  const headerTotal = headerInputs.length;
+  
+  headerInputs.forEach((inp, stuCol) => {
+    rec.headers[stuCol] = inp.value;
+    let foundIdx = -1;
+    for (let k = 0; k < ex.columns.length; k++) {
+      if (usedCorrectCols.has(k)) continue;
+      const alts = ex.columnAlts ? ex.columnAlts[k] : [];
+      if (isHeaderCorrect(inp.value, ex.columns[k], alts)) {
+        foundIdx = k; usedCorrectCols.add(k); break;
+      }
+    }
+    mapping[stuCol] = foundIdx;
+    if (foundIdx !== -1) headerCorrect++;
+  });
+  
+  // 對應資料格
+  let cellCorrect = 0;
+  const cellTotal = cellInputs.length;
+  cellInputs.forEach(inp => {
+    const r = +inp.dataset.r, stuCol = +inp.dataset.c;
+    rec.cells[`${r}-${stuCol}`] = inp.value;
+    const correctCol = mapping[stuCol];
+    if (correctCol === -1) return;
+    const ans = ex.rows[r][correctCol] || "";
+    if (isEqual(inp.value, ans)) cellCorrect++;
+  });
+  
+  rec.headerScore = headerCorrect;
+  rec.headerTotal = headerTotal;
+  rec.cellScore = cellCorrect;
+  rec.cellTotal = cellTotal;
+  rec.score = headerCorrect + cellCorrect;
+  rec.total = headerTotal + cellTotal;
+  rec.mapping = mapping;
+  rec.submitted = true;
+  rec.time = getTimeStr();
+  showToast(`✅ 已提交！分數：${rec.score}/${rec.total}`);
+  render();
+};
+
+window.revealMode2 = function() {
+  const rec = ensureRecord();
+  rec.revealed = true;
+  const ex = getCurrentExamples()[currentExample];
+  const headerInputs = document.querySelectorAll('#buildTable input.header');
+  const cellInputs = document.querySelectorAll('#buildTable input.cell');
+  const mapping = rec.mapping || [];
+  
+  headerInputs.forEach((inp, stuCol) => {
+    if (mapping[stuCol] !== -1) {
+      inp.classList.add('reveal-correct');
     } else {
-      inp.classList.add('wrong'); inp.classList.remove('correct');
+      inp.classList.add('reveal-wrong');
+      const tag = document.createElement('div');
+      tag.style.cssText = 'font-size:0.7em;color:green;';
+      tag.textContent = '參考: ' + ex.columns.join(', ');
+      if (stuCol === 0) inp.parentNode.appendChild(tag);
     }
   });
-  const fb = document.getElementById('fb2');
-  fb.innerHTML = `答對 ${correct} / ${total} 格` + (correct===total ? ' 🎉 完美！你已掌握追蹤表！' : ' — 紅色格子是錯的，請重試。');
-  fb.className = 'feedback ' + (correct===total ? 'ok' : 'bad');
+  
+  cellInputs.forEach(inp => {
+    const r = +inp.dataset.r, stuCol = +inp.dataset.c;
+    const correctCol = mapping[stuCol];
+    if (correctCol === -1) { inp.classList.add('reveal-wrong'); return; }
+    const ans = ex.rows[r][correctCol] || "";
+    if (isEqual(inp.value, ans)) inp.classList.add('reveal-correct');
+    else {
+      inp.classList.add('reveal-wrong');
+      inp.title = `正確答案：${ans}`;
+    }
+  });
+  showToast('已顯示正確答案（供學習，分數不變）');
 };
 
 /* ================ 模式三 ================ */
 function renderMode3(ex) {
-  let html = `<div id="captureArea">${captureHeaderHTML(ex)}<div class="row">
+  const rec = ensureRecord();
+  if (!rec.questionResults) rec.questionResults = {};
+  
+  let html = `<div id="captureArea">${captureHeaderHTML(ex)}`;
+  // 模式三的「整體分數」= 已答對的問題數 / 總問題數
+  const totalQs = 2 + ex.questions.length;
+  let answeredCorrect = 0, answered = 0;
+  Object.values(rec.questionResults).forEach(q => { answered++; if (q.correct) answeredCorrect++; });
+  if (answered > 0) {
+    // 顯示階段性徽章
+    html += `<div class="submit-badge ${answeredCorrect===totalQs?'success':(answeredCorrect>=totalQs*0.6?'partial':'fail')}">
+      📊 進度：已答 ${answered}/${totalQs} 題 &nbsp;|&nbsp; 答對 ${answeredCorrect}/${answered} &nbsp;|&nbsp; 最近作答時間：${rec.time || '-'}
+      ${rec.resetCount>0?`<br><span style="color:#c0392b;font-weight:normal;">⚠️ 重做次數：${rec.resetCount}</span>`:''}
+    </div>`;
+  }
+  html += `<div class="row">
     <div class="col"><h3>偽代碼</h3><pre>${ex.code}</pre>
     <h3>完整追蹤表 (參考)</h3><table><tr>`;
   ex.columns.forEach(c => html += `<th>${c}</th>`);
@@ -631,58 +869,82 @@ function renderMode3(ex) {
   });
   html += '</table></div>';
 
-  html += `<div class="col"><h3>回答以下問題</h3>`;
-  html += `<div class="q-block">
-    <b>Q1. 算法的輸出是什麼？</b><br>
-    <input type="text" id="qOut" placeholder="例如: 55">
-    <button onclick="checkQ('qOut','${ex.output.replace(/'/g,"\\'")}')">檢查</button>
-    <span id="fbqOut"></span>
-  </div>`;
-  html += `<div class="q-block">
-    <b>Q2. 算法的目的是什麼？</b><br>
-    <input type="text" id="qPurpose" placeholder="用一句說明">
-    <button onclick="checkPurpose()">檢查</button>
-    <span id="fbPurpose"></span>
-  </div>`;
+  html += `<div class="col"><h3>回答以下問題 (每題只能提交一次！)</h3>`;
+  
+  // Q1: 輸出
+  html += questionBlockHTML('qOut', 'Q1. 算法的輸出是什麼？', 'out', ex.output, rec);
+  // Q2: 目的
+  html += questionBlockHTML('qPurpose', 'Q2. 算法的目的是什麼？', 'purpose', null, rec);
+  // 其他問題
   ex.questions.forEach((qq, i) => {
-    html += `<div class="q-block">
-      <b>Q${i+3}. ${qq.q}</b><br>
-      <input type="text" id="q${i}" placeholder="輸入答案">
-      <button onclick="checkCustomQ(${i})">檢查</button>
-      <span id="fbq${i}"></span>
-    </div>`;
+    html += questionBlockHTML('q'+i, `Q${i+3}. ${qq.q}`, 'q'+i, null, rec);
   });
   html += '</div></div></div>';
-  html += `<div style="margin-top:14px;">${shareButtonsHTML()}</div>`;
+  html += `<div style="margin-top:14px;">
+    <button class="danger" onclick="confirmReset()">⚠️ 重新開始所有問題（會記錄）</button>
+    ${shareButtonsHTML()}
+  </div>`;
   content.innerHTML = html;
 }
 
-window.checkQ = function(id, ans) {
-  const val = document.getElementById(id).value;
-  const fb = document.getElementById('fb' + id);
-  if (isEqual(val, ans)) { fb.textContent = ' ✔ 正確！'; fb.className = 'ok'; }
-  else { fb.textContent = ' ✘ 錯誤，請再試。'; fb.className = 'bad'; }
-};
+function questionBlockHTML(inputId, qText, key, ans, rec) {
+  const result = rec.questionResults[key];
+  const locked = result !== undefined;
+  const value = locked ? result.answer : '';
+  const disabled = locked ? 'disabled' : '';
+  let feedback = '';
+  if (locked) {
+    feedback = result.correct
+      ? `<span class="ok" style="margin-left:10px;">✔ 正確！ (已鎖定)</span>`
+      : `<span class="bad" style="margin-left:10px;">✘ 錯誤 (已鎖定，不能再改)</span>`;
+  }
+  let btn = '';
+  if (!locked) {
+    btn = `<button onclick="submitQ3('${key}','${inputId}')">🔒 提交此題</button>`;
+  }
+  return `<div class="q-block">
+    <b>${qText}</b><br>
+    <input type="text" id="${inputId}" value="${value}" ${disabled} placeholder="輸入答案">
+    ${btn}
+    ${feedback}
+  </div>`;
+}
 
-window.checkCustomQ = function(i) {
+window.submitQ3 = function(key, inputId) {
   const ex = getCurrentExamples()[currentExample];
-  const val = normalize(document.getElementById('q'+i).value);
-  const fb = document.getElementById('fbq'+i);
-  const answers = ex.questions[i].a.map(a => normalize(a));
-  const match = answers.some(a => val === a || (val.length>0 && val.includes(a)));
-  if (match) { fb.textContent = ' ✔ 正確！'; fb.className='ok'; }
-  else { fb.textContent = ' ✘ 錯誤，請再試。'; fb.className='bad'; }
-};
-
-window.checkPurpose = function() {
-  const ex = getCurrentExamples()[currentExample];
-  const val = normalize(document.getElementById('qPurpose').value);
-  const fb = document.getElementById('fbPurpose');
-  if (val.length === 0) { fb.textContent = ' ✘ 請輸入答案'; fb.className='bad'; return; }
-  const keywords = (ex.purpose.toLowerCase().match(/[\u4e00-\u9fa5a-z0-9]+/g) || []).filter(k => k.length >= 2);
-  let hits = keywords.filter(k => val.includes(k)).length;
-  if (hits >= 2) { fb.textContent = ' ✔ 正確！'; fb.className='ok'; }
-  else { fb.textContent = ' ✘ 錯誤，請再試。'; fb.className='bad'; }
+  const val = document.getElementById(inputId).value.trim();
+  if (val === '') { showToast('⚠️ 請先輸入答案才能提交！'); return; }
+  if (!confirm('確定提交此題？\n提交後不能再修改！')) return;
+  
+  const rec = ensureRecord();
+  let correct = false;
+  
+  if (key === 'out') {
+    correct = isEqual(val, ex.output);
+  } else if (key === 'purpose') {
+    const keywords = (ex.purpose.toLowerCase().match(/[\u4e00-\u9fa5a-z0-9]+/g) || []).filter(k => k.length >= 2);
+    const v = normalize(val);
+    const hits = keywords.filter(k => v.includes(k)).length;
+    correct = hits >= 2;
+  } else if (key.startsWith('q')) {
+    const i = parseInt(key.substring(1));
+    const answers = ex.questions[i].a.map(a => normalize(a));
+    const v = normalize(val);
+    correct = answers.some(a => v === a || (v.length>0 && v.includes(a)));
+  }
+  
+  rec.questionResults[key] = { answer: val, correct: correct };
+  rec.time = getTimeStr();
+  // 計算總分
+  const totalQs = 2 + ex.questions.length;
+  let answeredCorrect = 0;
+  Object.values(rec.questionResults).forEach(q => { if (q.correct) answeredCorrect++; });
+  rec.score = answeredCorrect;
+  rec.total = totalQs;
+  rec.submitted = Object.keys(rec.questionResults).length === totalQs;
+  
+  showToast(correct ? '✅ 正確！已鎖定' : '❌ 錯誤，已鎖定');
+  render();
 };
 
 /* 初始化 */
