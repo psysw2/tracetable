@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<title>追蹤表學習工具 (Trace Table Learning Tool)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; margin: 20px; background: #f5f7fa; color:#222; }
+  h1 { color: #2c3e50; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab { padding: 10px 18px; background: #dfe6ec; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  .tab.active { background: #2c7be5; color: white; }
+  .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+  .row { display: flex; gap: 20px; flex-wrap: wrap; }
+  .col { flex: 1; min-width: 300px; }
+  pre { background: #f4f4f4; padding: 12px; border-left: 4px solid #2c7be5; font-family: Consolas, monospace; white-space: pre-wrap; }
+  table { border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #999; padding: 6px 10px; text-align: center; min-width: 50px; }
+  th { background: #ffe0e0; color: #c00; }
+  input.cell { 
+  width: 90px; 
+  min-width: 90px;
+  text-align: center; 
+  border: 2px dashed #2c7be5; 
+  background: #eef6ff; 
+  padding: 4px 6px;
+  font-size: 1em;
+  box-sizing: border-box;
+  }
+  input.header { 
+  width: 110px; 
+  min-width: 110px;
+  text-align: center; 
+  border: 2px dashed #c0392b; 
+  background: #fff3cd; 
+  font-weight: bold; 
+  color: #c0392b; 
+  padding: 4px 6px;
+  font-size: 1em;
+  box-sizing: border-box;
+  }
+  input.cell:disabled, input.header:disabled { cursor: not-allowed; opacity: 0.85; }
+  /* 只在「查看答案」後才顯示對錯顏色 */
+  input.cell.reveal-correct, input.header.reveal-correct { background: #c8f7c5 !important; border: 2px solid green !important; color: #222 !important; }
+  input.cell.reveal-wrong, input.header.reveal-wrong { background: #ffd1d1 !important; border: 2px solid red !important; }
+  button { background: #2c7be5; color: white; padding: 8px 14px; border: none; border-radius: 5px; cursor: pointer; margin-right: 6px; margin-top: 10px; font-size: 0.95em; }
+  button:hover { background: #1a5bb8; }
+  button:disabled { background: #aaa; cursor: not-allowed; }
+  button.secondary { background: #6c757d; }
+  button.danger { background: #c0392b; }
+  button.action { background: #28a745; }
+  button.action:hover { background: #1e7e34; }
+  button.action2 { background: #e67e22; }
+  button.action2:hover { background: #ca6510; }
+  button.reveal { background: #8e44ad; }
+  .feedback { margin-top: 10px; font-weight: bold; }
+  .ok { color: green; }
+  .bad { color: red; }
+  select { padding: 6px; }
+  .q-block { margin-top: 14px; padding: 10px; background: #fafafa; border-left: 3px solid #f39c12; position: relative; }
+  .q-block input[type=text] { padding: 6px; width: 220px; }
+  .hint { font-size: 0.9em; color: #555; }
+  label { display: block; margin: 5px 0; }
+  .mode-desc { background: #eaf4ff; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.95em; }
+  .name-bar { background: #fff7e6; border: 1px solid #f0c787; padding: 10px; border-radius: 6px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .name-bar input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 180px; }
+  .capture-header { margin-bottom: 10px; padding: 8px; background: #f0f8ff; border-radius: 4px; font-size: 0.95em; }
+  .submit-badge { margin: 10px 0; padding: 12px; border-radius: 6px; font-weight: bold; border: 2px solid; }
+  .submit-badge.success { background: #d4edda; border-color: #28a745; color: #155724; }
+  .submit-badge.partial { background: #fff3cd; border-color: #ffc107; color: #856404; }
+  .submit-badge.fail { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+  .warn-banner { background: #ffe5e5; border: 2px dashed #c0392b; padding: 8px 12px; border-radius: 6px; margin: 10px 0; color: #c0392b; font-weight: bold; font-size: 0.95em; }
+  .toast { position: fixed; top: 20px; right: 20px; background: #333; color: white; padding: 12px 20px; border-radius: 6px; opacity: 0; transition: opacity 0.3s; z-index: 1000; }
+  .toast.show { opacity: 1; }
+  .legend { font-size: 0.85em; color: #555; margin-top: 6px; }
+  .legend span { display: inline-block; padding: 2px 8px; border-radius: 3px; margin-right: 6px; }
+  .submitted-mark { color: #28a745; font-weight: bold; font-size: 1.1em; }
+  /* 防止文字被邊框裁走 */
+td, th { 
+  overflow: visible; 
+}
+
+/* 截圖專用：文字顯示格 (取代 input) */
+.capture-text {
+  display: inline-block;
+  min-width: 80px;
+  padding: 6px 10px;
+  border: 2px solid #2c7be5;
+  background: #eef6ff;
+  text-align: center;
+  font-family: Consolas, monospace;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.capture-text.header {
+  border-color: #c0392b;
+  background: #fff3cd;
+  color: #c0392b;
+  font-weight: bold;
+}
+.capture-text.correct { background: #c8f7c5; border-color: green; color: #222;}
+.capture-text.wrong { background: #ffd1d1; border-color: red; }
+.capture-text.empty { background: #f0f0f0; border-style: dashed; color: #999; }
+
+</style>
+</head>
+<body>
+
+<h1>📘 追蹤表學習工具 Trace Table</h1>
+<p class="hint">教學重點：1) 追蹤表根據變量建立 &nbsp; 2) 常用於循環結構 &nbsp; 3) 可看出算法的目的</p>
+
+<div class="name-bar">
+  👤 <b>學生姓名：</b>
+  <input type="text" id="studentName" placeholder="請輸入姓名 (會顯示在截圖上)">
+  <span class="hint">完成後可按「複製文字」或「下載截圖」貼到 Padlet！</span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-mode="1">模式一：填充追蹤表</div>
+  <div class="tab" data-mode="2">模式二：由零開始建立追蹤表</div>
+  <div class="tab" data-mode="3">模式三：回答問題</div>
+</div>
+
+<div class="container">
+  <div id="modeDesc" class="mode-desc"></div>
+  <div class="warn-banner">⚠️ 重要：每題<u>只能提交一次</u>！提交後分數會鎖定，請先仔細檢查所有答案才按「提交」。</div>
+  <label>選擇例子：
+    <select id="exampleSelect"></select>
+  </label>
+  <div id="content"></div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ==================== 種子化亂數 (Seeded RNG) ==================== */
+function hashString(str) {
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+function mulberry32(seed) {
+  return function() {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function randInt(rng, min, max) { return Math.floor(rng() * (max - min + 1)) + min; }
+function pickOne(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
+function shuffleArr(rng, arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function pickBlanks(rng, numRows, validCols, blanksPerRow, startRow = 1) {
+  const result = [];
+  for (let r = startRow; r < startRow + numRows; r++) {
+    const shuffled = shuffleArr(rng, validCols);
+    for (let i = 0; i < Math.min(blanksPerRow, shuffled.length); i++) {
+      result.push([r, shuffled[i]]);
+    }
+  }
+  return result;
+}
+function getStudentSeed() {
+  const name = (document.getElementById('studentName')?.value || '').trim();
+  return name || 'DEFAULT_GUEST';
+}
+
+  
+/* ==================== 模式一：生成器 ==================== */
+const generatorsMode1 = [
+  // E1: Fibonacci-like repeat-until
+  function(rng) {
+    const a = randInt(rng, 1, 3);
+    const b = randInt(rng, 4, 7);
+    const thr = pickOne(rng, [25, 30, 35, 40, 45]);
+    const rows = [[String(a), String(b), '0', '', '']];
+    let A = a, B = b, C = 0;
+    while (C < 20) {
+      A = A + B; B = A + B; C++;
+      const cond = B > thr;
+      rows.push([String(A), String(B), String(C), cond?'True':'False', '']);
+      if (cond) break;
+    }
+    const fA = rows[rows.length-1][0], fC = rows[rows.length-1][2];
+    rows.push(['', '', '', '', `${fA} ${fC}`]);
+    const blanks = pickBlanks(rng, rows.length - 2, [0,1,2,3], 2, 1);
+    blanks.push([rows.length - 1, 4]);
+    return {
+      title: "M1-例1：重複循環 (A, B, C)",
+      code: `A ← ${a}\nB ← ${b}\nC ← 0\n重複\n    A ← A + B\n    B ← A + B\n    C ← C + 1\n直至 B > ${thr}\n輸出 A, C`,
+      columns: ["A", "B", "C", `B > ${thr}`, "輸出"],
+      rows, blanks
+    };
+  },
+  // E2: while X>Y
+  function(rng) {
+    const x = randInt(rng, 18, 25);
+    const y = randInt(rng, 2, 4);
+    const rows = [['', String(x), String(y), '']];
+    let X = x, Y = y;
+    while (rows.length < 15) {
+      const cond = X > Y;
+      if (!cond) { rows.push(['False', '', '', '']); break; }
+      X = X - 1; Y = Y + Y;
+      rows.push(['True', String(X), String(Y), '"Run"']);
+    }
+    const blanks = [];
+    for (let r = 1; r < rows.length - 1; r++) {
+      shuffleArr(rng, [1,2,3]).slice(0, 2).forEach(c => blanks.push([r, c]));
+    }
+    blanks.push([rows.length-1, 0]);
+    return {
+      title: "M1-例2：當型循環 (X > Y)",
+      code: `X ← ${x}\nY ← ${y}\n當 X > Y\n    X ← X - 1\n    Y ← Y + Y\n    輸出 "Run"`,
+      columns: ["X > Y", "X", "Y", "輸出"],
+      rows, blanks
+    };
+  },
+  // E3: even sum
+  function(rng) {
+    const N = pickOne(rng, [8, 10, 12, 14, 16]);
+    const step = 2;
+    const rows = [['0', '0', '2', '']];
+    let total = 0, count = 0, K = 2;
+    while (K <= N) {
+      total += K; count++; K += step;
+      rows.push([String(total), String(count), String(K), 'True']);
+    }
+    rows.push(['', '', '', 'False']);
+    const blanks = [];
+    for (let r = 1; r < rows.length - 1; r++) {
+      shuffleArr(rng, [0,1,2]).slice(0, 1).forEach(c => blanks.push([r, c]));
+    }
+    blanks.push([rows.length - 1, 3]);
+    return {
+      title: "M1-例3：偶數求和",
+      code: `total ← 0\ncount ← 0\nK ← 2\n當 K <= ${N}\n    total ← total + K\n    count ← count + 1\n    K ← K + 2\n輸出 total, count`,
+      columns: ["total", "count", "K", `K <= ${N}`],
+      rows, blanks
+    };
+  },
+  // E4: powers of 2
+  function(rng) {
+    const N = randInt(rng, 4, 7);
+    const rows = [['', '1', '1']];
+    let P = 1, M = 1;
+    while (M <= N) {
+      P *= 2; M++;
+      rows.push(['True', String(P), String(M)]);
+    }
+    rows.push(['False', '', '']);
+    const blanks = [];
+    for (let r = 1; r < rows.length - 1; r++) {
+      blanks.push([r, pickOne(rng, [1, 2])]);
+    }
+    blanks.push([rows.length - 1, 0]);
+    return {
+      title: "M1-例4：計算 2 的次方",
+      code: `P ← 1\nM ← 1\n當 M <= ${N}\n    P ← P * 2\n    M ← M + 1\n輸出 P`,
+      columns: [`M <= ${N}`, "P", "M"],
+      rows, blanks
+    };
+  }
+];
+
+/* ==================== 模式二：生成器 ==================== */
+const generatorsMode2 = [
+  // E1: three-variable
+  function(rng) {
+    const x = randInt(rng, 1, 3), y = randInt(rng, 2, 4), z = randInt(rng, 3, 5);
+    const thr = pickOne(rng, [40, 50, 60, 70]);
+    const rows = [[String(x), String(y), String(z), '', '']];
+    let X = x, Y = y, Z = z;
+    while (rows.length < 12) {
+      const oldX = X;
+      X = Y + Z; Y = oldX + Z; Z = oldX + Y + Z; // simulate: new X=Y+Z; new Y=X+Z (uses new X); new Z=X+Y (uses new X, Y)
+      // 正確模擬：
+      // 重新做
+      break;
+    }
+    // 重新正確模擬
+    X = x; Y = y; Z = z;
+    const rows2 = [[String(X), String(Y), String(Z), '', '']];
+    while (rows2.length < 12) {
+      const newX = Y + Z;
+      const newY = newX + Z;
+      const newZ = newX + newY;
+      X = newX; Y = newY; Z = newZ;
+      const cond = Z > thr;
+      rows2.push([String(X), String(Y), String(Z), cond?'True':'False', '']);
+      if (cond) break;
+    }
+    rows2.push(['', '', '', '', `${X} ${Y} ${Z}`]);
+    return {
+      title: "M2-例1：三變量交替更新",
+      code: `X ← ${x}\nY ← ${y}\nZ ← ${z}\n重複\n    X ← Y + Z\n    Y ← X + Z\n    Z ← X + Y\n直至 Z > ${thr}\n輸出 X, Y, Z`,
+      columns: ["X", "Y", "Z", `Z > ${thr}`, "輸出"],
+      columnAlts: [["x"], ["y"], ["z"], [`z>${thr}`, `z > ${thr}`], ["輸出","output"]],
+      rows: rows2
+    };
+  },
+  // E2: N -= step
+  function(rng) {
+    const N0 = randInt(rng, 45, 60);
+    const step = pickOne(rng, [5, 6, 7, 8]);
+    const thr = pickOne(rng, [8, 10, 12]);
+    const rows = [['', String(N0), '0']];
+    let N = N0, s = 0;
+    while (rows.length < 20) {
+      if (N > thr) { N -= step; s++; rows.push(['True', String(N), String(s)]); }
+      else { rows.push(['False', '', '']); break; }
+    }
+    return {
+      title: "M2-例2：遞減計步",
+      code: `N ← ${N0}\nstep ← 0\n當 N > ${thr}\n    N ← N - ${step}\n    step ← step + 1\n輸出 N, step`,
+      columns: [`N > ${thr}`, "N", "step"],
+      columnAlts: [[`n>${thr}`, `n > ${thr}`], ["n"], ["step"]],
+      rows
+    };
+  },
+  // E3: odd product
+  function(rng) {
+    const maxN = pickOne(rng, [7, 9, 11]);
+    const rows = [['', '1', '1']];
+    let result = 1, n = 1;
+    while (n <= maxN) {
+      result *= n; n += 2;
+      rows.push(['True', String(result), String(n)]);
+    }
+    rows.push(['False', '', '']);
+    return {
+      title: "M2-例3：奇數連乘",
+      code: `result ← 1\nn ← 1\n當 n <= ${maxN}\n    result ← result * n\n    n ← n + 2\n輸出 result`,
+      columns: [`n <= ${maxN}`, "result", "n"],
+      columnAlts: [[`n<=${maxN}`, `n <= ${maxN}`], ["result"], ["n"]],
+      rows
+    };
+  },
+  // E4: P > Q convergence
+  function(rng) {
+    const P0 = randInt(rng, 8, 14);
+    const qStep = pickOne(rng, [2, 3, 4]);
+    const rows = [['', String(P0), '0']];
+    let P = P0, Q = 0;
+    while (rows.length < 20) {
+      if (P > Q) { Q += qStep; P -= 1; rows.push(['True', String(P), String(Q)]); }
+      else { rows.push(['False', '', '']); break; }
+    }
+    return {
+      title: "M2-例4：雙變量相遇",
+      code: `P ← ${P0}\nQ ← 0\n當 P > Q\n    Q ← Q + ${qStep}\n    P ← P - 1\n輸出 P, Q`,
+      columns: ["P > Q", "P", "Q"],
+      columnAlts: [["p>q", "p > q"], ["p"], ["q"]],
+      rows
+    };
+  }
+];
+
+/* ==================== 模式三：生成器 ==================== */
+const generatorsMode3 = [
+  // E1: sum of squares
+  function(rng) {
+    const N = randInt(rng, 4, 7);
+    const rows = [['', '0', '1']];
+    let sum = 0, n = 1;
+    while (n <= N) { sum += n*n; n++; rows.push(['True', String(sum), String(n)]); }
+    rows.push(['False', '', '']);
+    return {
+      title: "M3-例1：平方累加",
+      code: `sum ← 0\nn ← 1\n當 n <= ${N}\n    sum ← sum + n * n\n    n ← n + 1\n輸出 sum`,
+      columns: [`n <= ${N}`, "sum", "n"],
+      rows,
+      output: String(sum),
+      purpose: `計算 1² 到 ${N}² 的平方和 (= ${sum})。`,
+      questions: [
+        { q: "循環體共執行多少次？", a: [String(N)] },
+        { q: "sum 最後的值是多少？", a: [String(sum)] },
+        { q: "這個算法計算的是什麼？(提示：次方)", a: ["平方和", "平方", "square", "平方的和"] }
+      ]
+    };
+  },
+  // E2: if-else loop
+  function(rng) {
+    const A0 = pickOne(rng, [6, 8, 10, 12]);
+    const B0 = randInt(rng, 2, 4);
+    const step = 2;
+    const rows = [['', '', String(A0), String(B0), '0']];
+    let A = A0, B = B0, C = 0, elseCount = 0;
+    while (rows.length < 20) {
+      if (A > 0) {
+        if (A > B) { C += A; rows.push(['True','True',String(A-step),String(B),String(C)]); }
+        else { C += B; elseCount++; rows.push(['True','False',String(A-step),String(B),String(C)]); }
+        A -= step;
+      } else { rows.push(['False','','','','']); break; }
+    }
+    return {
+      title: "M3-例2：含 if-else 的循環",
+      code: `A ← ${A0}\nB ← ${B0}\nC ← 0\n當 A > 0\n    如果 A > B 則\n        C ← C + A\n    否則\n        C ← C + B\n    A ← A - ${step}\n輸出 C`,
+      columns: ["A > 0", "A > B", "A", "B", "C"],
+      rows,
+      output: String(C),
+      purpose: `每次若 A 大於 B 則把 A 累加到 C，否則加 B；A 每次遞減 ${step}。`,
+      questions: [
+        { q: "算法的輸出是多少？", a: [String(C)] },
+        { q: "「否則」分支被執行了多少次？", a: [String(elseCount)] },
+        { q: "若把 B 改為 100，輸出會改變嗎？(是/否)", a: ["是", "yes", "會"] }
+      ]
+    };
+  },
+  // E3: digit sum
+  function(rng) {
+    const N0 = randInt(rng, 100, 999);
+    const rows = [['', '0', String(N0)]];
+    let N = N0, S = 0;
+    while (N > 0) {
+      S += N % 10; N = Math.floor(N / 10);
+      rows.push(['True', String(S), String(N)]);
+    }
+    rows.push(['False', '', '']);
+    // 4位數所需迴圈數
+    let n4 = 1000, loops1000 = 0;
+    while (n4 > 0) { n4 = Math.floor(n4/10); loops1000++; }
+    return {
+      title: "M3-例3：數位和 (digit sum)",
+      code: `N ← ${N0}\nS ← 0\n當 N > 0\n    S ← S + (N mod 10)\n    N ← N div 10\n輸出 S`,
+      columns: ["N > 0", "S", "N"],
+      rows,
+      output: String(S),
+      purpose: `逐位取出 N 的個位數並相加，計算 ${N0} 各位數之和 (= ${S})。`,
+      questions: [
+        { q: "算法的輸出是多少？", a: [String(S)] },
+        { q: "這個算法的目的是什麼？", a: ["數位和", "digit sum", "各位數字之和", "位數和", "各位之和"] },
+        { q: "若把 N 改為 1000，循環會執行多少次？", a: [String(loops1000)] }
+      ]
+    };
+  },
+  // E4: multiplicative
+  function(rng) {
+    const mul = pickOne(rng, [2, 3, 4]);
+    const thr = pickOne(rng, [100, 200, 500]);
+    const rows = [['', '1', '0']];
+    let X = 1, count = 0;
+    while (X < thr && count < 20) {
+      X *= mul; count++;
+      rows.push(['True', String(X), String(count)]);
+    }
+    rows.push(['False', '', '']);
+    return {
+      title: "M3-例4：倍增計數",
+      code: `X ← 1\ncount ← 0\n當 X < ${thr}\n    X ← X * ${mul}\n    count ← count + 1\n輸出 X, count`,
+      columns: [`X < ${thr}`, "X", "count"],
+      rows,
+      output: `${X} ${count}`,
+      purpose: `不斷把 X 乘以 ${mul}，直到 X 達到或超過 ${thr}；count 記錄需要多少次。`,
+      questions: [
+        { q: "算法輸出的 X 值是多少？", a: [String(X)] },
+        { q: "算法輸出的 count 值是多少？", a: [String(count)] },
+        { q: "這個算法的目的是什麼？", a: ["倍增", `${mul}倍`, `達到${thr}`, "指數成長", "最少次數", `${mul}的次方`] }
+      ]
+    };
+  }
+];
+
+/* ================ 主控制 ================ */
+const modeData = {
+  1: { generators: generatorsMode1, desc: "請在藍色格子填寫正確答案。填滿後按「提交」（只能提交一次！）。" },
+  2: { generators: generatorsMode2, desc: "請根據偽代碼，由零開始建立整個追蹤表——包括【黃色的欄位標題】和【藍色的每一格數值】！填滿後按「提交」（只能提交一次！）。" },
+  3: { generators: generatorsMode3, desc: "參考完整追蹤表，回答下方各條問題。每題只能提交一次！" }
+};
+
+// 快取：每個學生種子只生成一次，令同學做重做時題目不變
+let examplesCache = {};
+let currentSeedCache = null;
+
+function buildExamplesForSeed(seed) {
+  if (examplesCache[seed]) return;
+  examplesCache[seed] = {};
+  for (const mode of [1, 2, 3]) {
+    examplesCache[seed][mode] = modeData[mode].generators.map((gen, i) => 
+      gen(mulberry32(hashString(seed + '_M' + mode + '_E' + i)))
+    );
+  }
+}
+
+let currentMode = 1;
+let currentExample = 0;
+
+/* ★ 提交記錄：每個 (mode, example) 只能提交一次 
+   結構: submissionLog["mode-example"] = { submitted, score, total, headerScore, headerTotal, cellScore, cellTotal, time, revealed, resetCount, questionResults } */
+const submissionLog = {};
+function keyOf(mode, ex) { return `${mode}-${ex}`; }
+function getCurrentKey() { return keyOf(currentMode, currentExample); }
+function getSubmission() { return submissionLog[getCurrentKey()]; }
+function ensureRecord() {
+  const k = getCurrentKey();
+  if (!submissionLog[k]) submissionLog[k] = { submitted:false, resetCount:0, questionResults:{} };
+  return submissionLog[k];
+}
+
+const tabs = document.querySelectorAll('.tab');
+const select = document.getElementById('exampleSelect');
+const content = document.getElementById('content');
+const modeDesc = document.getElementById('modeDesc');
+
+function getCurrentExamples() {
+  const seed = getStudentSeed();
+  buildExamplesForSeed(seed);
+  currentSeedCache = seed;
+  return examplesCache[seed][currentMode];
+}
+
+function normalize(s) {
+  return (s || "").toString().replace(/\s+/g, '').trim().toLowerCase();
+}
+function isEqual(userVal, answer) {
+  return normalize(userVal) === normalize(answer);
+}
+function isHeaderCorrect(userVal, primary, alts) {
+  const u = normalize(userVal);
+  if (u === normalize(primary)) return true;
+  if (Array.isArray(alts)) return alts.some(a => u === normalize(a));
+  return false;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function getTimeStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+}
+
+function updateDropdown() {
+  const exs = getCurrentExamples();
+  select.innerHTML = '';
+  exs.forEach((ex, i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = ex.title;
+    select.appendChild(opt);
+  });
+  currentExample = 0;
+  select.value = 0;
+  modeDesc.textContent = "📌 " + modeData[currentMode].desc;
+}
+
+tabs.forEach(t => t.addEventListener('click', () => {
+  tabs.forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  currentMode = parseInt(t.dataset.mode);
+  /* 姓名改變 → 重新生成題目（需清除記錄） */
+document.getElementById('studentName').addEventListener('blur', function() {
+  const newSeed = getStudentSeed();
+  if (currentSeedCache && currentSeedCache !== newSeed) {
+    const hasSubmissions = Object.values(submissionLog).some(r => r && (r.submitted || (r.questionResults && Object.keys(r.questionResults).length > 0)));
+    if (hasSubmissions) {
+      if (!confirm('⚠️ 更改姓名會令題目重新產生（因為題目以姓名為種子）！\n所有已提交記錄會被清空，確定嗎？')) {
+        document.getElementById('studentName').value = (currentSeedCache === 'DEFAULT_GUEST' ? '' : currentSeedCache);
+        return;
+      }
+    }
+    Object.keys(submissionLog).forEach(k => delete submissionLog[k]);
+    delete examplesCache[newSeed]; // 強制重新生成
+  }
+  render();
+});
+  updateDropdown();
+  render();
+}));
+select.addEventListener('change', () => { currentExample = parseInt(select.value); render(); });
+
+function render() {
+  const ex = getCurrentExamples()[currentExample];
+  if (currentMode === 1) renderMode1(ex);
+  else if (currentMode === 2) renderMode2(ex);
+  else renderMode3(ex);
+}
+
+/* ================ 共用：截圖標題 & 分享按鈕 ================ */
+function captureHeaderHTML(ex) {
+  const name = document.getElementById('studentName').value.trim() || "(未填姓名)";
+  const rec = getSubmission();
+  const submittedInfo = (rec && rec.submitted)
+    ? `<br>✅ <b>已提交</b> &nbsp;|&nbsp; 分數：<b>${rec.score}/${rec.total}</b> (${Math.round(rec.score/rec.total*100)}%) &nbsp;|&nbsp; 提交時間：${rec.time}${rec.resetCount>0?` &nbsp;|&nbsp; <span style="color:#c0392b;">重做次數：${rec.resetCount}</span>`:''}${rec.revealed?` &nbsp;|&nbsp; <span style="color:#8e44ad;">已查看答案</span>`:''}`
+    : `<br>⏳ <b>未提交</b>`;
+  return `<div class="capture-header">
+    👤 <b>學生：</b>${name} &nbsp;|&nbsp; 📅 ${getTimeStr()} &nbsp;|&nbsp; 📚 ${ex.title}
+    ${submittedInfo}
+  </div>`;
+}
+
+function shareButtonsHTML() {
+  return `<button class="action" onclick="downloadScreenshot()">📸 下載截圖</button>
+          <button class="action2" onclick="copyAsText()">📋 複製文字</button>`;
+}
+
+/* ================ 截圖 ================ */
+window.downloadScreenshot = function() {
+  const target = document.getElementById('captureArea');
+  if (!target) { showToast('找不到截圖區域'); return; }
+  if (typeof html2canvas === 'undefined') { showToast('截圖功能載入失敗'); return; }
+  showToast('正在產生截圖...');
+
+  // 🔑 步驟 1：把所有 input 暫時替換成 div（記錄原本的 input 以便還原）
+  const replacements = [];
+  const allInputs = target.querySelectorAll('input');
+  
+  allInputs.forEach(inp => {
+    const div = document.createElement('div');
+    const val = inp.value.trim();
+    
+    // 判斷類型與樣式
+    let bg = '#eef6ff', border = '#2c7be5', color = '#222', fontWeight = 'normal';
+    if (inp.classList.contains('header')) {
+      bg = '#fff3cd'; border = '#c0392b'; color = '#c0392b'; fontWeight = 'bold';
+    }
+    if (inp.classList.contains('reveal-correct')) {
+      bg = '#c8f7c5'; border = 'green'; color = '#222';
+    }
+    if (inp.classList.contains('reveal-wrong')) {
+      bg = '#ffd1d1'; border = 'red';
+    }
+    if (inp.type === 'text' && !inp.classList.contains('cell') && !inp.classList.contains('header')) {
+      // 姓名/問題回答框
+      bg = '#f9f9f9'; border = '#999';
+    }
+    
+    div.textContent = val || '(空)';
+    div.style.cssText = `
+      display: inline-block;
+      min-width: ${inp.offsetWidth}px;
+      min-height: ${inp.offsetHeight}px;
+      padding: 6px 10px;
+      border: 2px solid ${border};
+      background: ${bg};
+      color: ${val ? color : '#999'};
+      font-weight: ${fontWeight};
+      text-align: center;
+      font-family: Consolas, "Microsoft JhengHei", monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      border-radius: 3px;
+      white-space: nowrap;
+      vertical-align: middle;
+      box-sizing: border-box;
+    `;
+    
+    // 記錄以便還原
+    replacements.push({ original: inp, replacement: div, parent: inp.parentNode, nextSibling: inp.nextSibling });
+    inp.parentNode.insertBefore(div, inp);
+    inp.style.display = 'none';  // 隱藏原 input 而不移除（保留事件監聽）
+  });
+
+  // 🔑 步驟 2：等瀏覽器重繪完再截圖
+  setTimeout(() => {
+    html2canvas(target, { 
+      backgroundColor: '#ffffff', 
+      scale: 2,
+      logging: false,
+      useCORS: true
+    }).then(canvas => {
+      // 🔑 步驟 3：還原 DOM
+      replacements.forEach(r => {
+        r.replacement.remove();
+        r.original.style.display = '';
+      });
+      
+      // 下載
+      const name = document.getElementById('studentName').value.trim() || 'student';
+      const ex = getCurrentExamples()[currentExample];
+      const filename = `追蹤表_${name}_${ex.title}.png`.replace(/[\\/:*?"<>|]/g,'_');
+      const link = document.createElement('a');
+      link.download = filename; 
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      showToast('✅ 截圖已下載！');
+    }).catch(err => { 
+      // 出錯也要還原
+      replacements.forEach(r => {
+        r.replacement.remove();
+        r.original.style.display = '';
+      });
+      showToast('截圖失敗：' + err.message); 
+    });
+  }, 100);
+};
+
+/* ================ 複製文字 ================ */
+window.copyAsText = function() {
+  const ex = getCurrentExamples()[currentExample];
+  const name = document.getElementById('studentName').value.trim() || "(未填姓名)";
+  const rec = getSubmission();
+  
+  let text = `📘 追蹤表作業\n`;
+  text += `學生：${name}\n題目：${ex.title}\n`;
+  text += `匯出時間：${getTimeStr()}\n`;
+  if (rec && rec.submitted) {
+    text += `✅ 已提交 | 分數：${rec.score}/${rec.total} (${Math.round(rec.score/rec.total*100)}%)\n`;
+    text += `提交時間：${rec.time}\n`;
+    if (rec.resetCount > 0) text += `⚠️ 重做次數：${rec.resetCount}\n`;
+    if (rec.revealed) text += `🔍 已查看過正確答案\n`;
+  } else {
+    text += `⏳ 未提交\n`;
+  }
+  text += `-----------------------------------\n偽代碼：\n${ex.code}\n`;
+  text += `-----------------------------------\n`;
+  
+  const table = document.querySelector('#captureArea table');
+  if (table) {
+    text += `追蹤表：\n`;
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(row => {
+      const cells = row.querySelectorAll('th, td');
+      const rowText = Array.from(cells).map(c => {
+        const inp = c.querySelector('input');
+        if (inp) return (inp.value || '_').padEnd(6);
+        return (c.textContent || '').trim().padEnd(6);
+      }).join(' | ');
+      text += rowText + '\n';
+    });
+  }
+  
+  if (currentMode === 3 && rec && rec.questionResults) {
+    text += `-----------------------------------\n我的作答：\n`;
+    Object.keys(rec.questionResults).forEach(qk => {
+      const q = rec.questionResults[qk];
+      text += `${qk}: ${q.answer || '(未答)'} → ${q.correct ? '✔ 正確' : '✘ 錯誤'}\n`;
+    });
+  }
+  
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => showToast('✅ 已複製！可貼到 Padlet')).catch(() => fallbackCopy(text));
+  } else fallbackCopy(text);
+};
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); showToast('✅ 已複製！可貼到 Padlet'); }
+  catch(e) { showToast('複製失敗，請手動選取'); }
+  document.body.removeChild(ta);
+}
+
+/* ================ 提交徽章 & 控制按鈕 HTML ================ */
+function submitBadgeHTML(rec, total) {
+  if (!rec || !rec.submitted) return '';
+  const pct = Math.round(rec.score/rec.total*100);
+  const cls = pct === 100 ? 'success' : (pct >= 60 ? 'partial' : 'fail');
+  const emoji = pct === 100 ? '🎉' : (pct >= 60 ? '👍' : '💪');
+  let extra = '';
+  if (rec.headerScore !== undefined) {
+    extra = `<br><span style="font-weight:normal;">欄位標題：${rec.headerScore}/${rec.headerTotal} &nbsp;|&nbsp; 資料格：${rec.cellScore}/${rec.cellTotal}</span>`;
+  }
+  return `<div class="submit-badge ${cls}">
+    ${emoji} 已提交 — 分數：${rec.score}/${rec.total} (${pct}%) &nbsp;|&nbsp; 提交時間：${rec.time}
+    ${rec.resetCount>0?`<br><span style="color:#c0392b;font-weight:normal;">⚠️ 重做次數：${rec.resetCount}（會顯示在截圖上）</span>`:''}
+    ${extra}
+  </div>`;
+}
+
+function confirmReset() {
+  if (confirm('⚠️ 重新開始會清空所有答案！\n重做次數會被記錄並顯示在截圖上，老師會知道你重做過。\n\n確定重新開始嗎？')) {
+    const rec = ensureRecord();
+    rec.resetCount = (rec.resetCount || 0) + 1;
+    rec.submitted = false;
+    rec.score = null; rec.total = null;
+    rec.headerScore = undefined;
+    rec.revealed = false;
+    rec.questionResults = {};
+    render();
+    showToast(`已重置（重做第 ${rec.resetCount} 次）`);
+  }
+}
+window.confirmReset = confirmReset;
+
+/* ================ 模式一 ================ */
+function renderMode1(ex) {
+  const rec = ensureRecord();
+  let html = `<div id="captureArea">${captureHeaderHTML(ex)}`;
+  html += submitBadgeHTML(rec, ex.blanks.length);
+  html += `<div class="row">
+    <div class="col"><h3>偽代碼</h3><pre>${ex.code}</pre></div>
+    <div class="col"><h3>追蹤表 (請填寫藍色格)</h3>`;
+  html += '<table><tr>';
+  ex.columns.forEach(c => html += `<th>${c}</th>`);
+  html += '</tr>';
+  ex.rows.forEach((row, r) => {
+    html += '<tr>';
+    row.forEach((cell, c) => {
+      const isBlank = ex.blanks.some(b => b[0]===r && b[1]===c);
+      if (isBlank) {
+        const ansVal = cell;
+        const stuVal = (rec.answers && rec.answers[`${r}-${c}`]) || '';
+        const disabled = rec.submitted ? 'disabled' : '';
+        html += `<td><input class="cell" data-r="${r}" data-c="${c}" data-ans="${ansVal}" value="${stuVal}" ${disabled}></td>`;
+      } else {
+        html += `<td>${cell}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</table></div></div></div>';
+  
+  // 控制按鈕
+  html += `<div style="margin-top:14px;">`;
+  if (!rec.submitted) {
+    html += `<button onclick="submitMode1()">🔒 提交（只有一次機會）</button>
+             <button class="secondary" onclick="confirmReset()">清空重填</button>`;
+  } else {
+    html += `<button disabled>🔒 已提交，不能再改</button>
+             <button class="danger" onclick="confirmReset()">⚠️ 重新開始（會記錄）</button>`;
+    if (!rec.revealed) {
+      html += `<button class="reveal" onclick="revealMode1()">🔍 查看正確答案（僅供學習，不影響分數）</button>`;
+    }
+  }
+  html += shareButtonsHTML();
+  html += `<div id="fb1" class="feedback"></div></div>`;
+  content.innerHTML = html;
+}
+
+window.submitMode1 = function() {
+  const inputs = document.querySelectorAll('input.cell');
+  // 驗證必須全部填滿
+  for (const inp of inputs) {
+    if (inp.value.trim() === '') {
+      showToast('⚠️ 請先填滿所有藍色格子才能提交！');
+      return;
+    }
+  }
+  if (!confirm('確定提交？\n提交後不能再修改答案！')) return;
+  
+  const rec = ensureRecord();
+  let correct = 0, total = inputs.length;
+  rec.answers = {};
+  inputs.forEach(inp => {
+    const r = inp.dataset.r, c = inp.dataset.c;
+    rec.answers[`${r}-${c}`] = inp.value;
+    const ans = inp.dataset.ans || "";
+    if (isEqual(inp.value, ans)) correct++;
+  });
+  rec.submitted = true;
+  rec.score = correct;
+  rec.total = total;
+  rec.time = getTimeStr();
+  showToast(`✅ 已提交！分數：${correct}/${total}`);
+  render();
+};
+
+window.revealMode1 = function() {
+  const rec = ensureRecord();
+  rec.revealed = true;
+  const inputs = document.querySelectorAll('input.cell');
+  inputs.forEach(inp => {
+    const ans = inp.dataset.ans || "";
+    if (isEqual(inp.value, ans)) {
+      inp.classList.add('reveal-correct');
+    } else {
+      inp.classList.add('reveal-wrong');
+      inp.title = `正確答案：${ans}`;
+      // 顯示正確答案在紅格旁邊
+      if (!inp.nextSibling || !inp.nextSibling.classList || !inp.nextSibling.classList.contains('ans-tag')) {
+        const tag = document.createElement('div');
+        tag.className = 'ans-tag';
+        tag.style.cssText = 'font-size:0.75em;color:green;margin-top:2px;';
+        tag.textContent = '✓ ' + ans;
+        inp.parentNode.appendChild(tag);
+      }
+    }
+  });
+  showToast('已顯示正確答案（供學習，分數不變）');
+};
+
+/* ================ 模式二 ================ */
+function renderMode2(ex) {
+  const rec = ensureRecord();
+  const totalCells = ex.columns.length + ex.rows.length * ex.columns.length;
+  let html = `<div id="captureArea">${captureHeaderHTML(ex)}`;
+  html += submitBadgeHTML(rec, totalCells);
+  html += `<div class="row">
+    <div class="col"><h3>偽代碼</h3><pre>${ex.code}</pre>
+    <p class="hint">💡 提示：<br>
+    • 先從偽代碼找出所有<b>變量</b>和<b>條件判斷</b>，填入黃色欄位標題<br>
+    • 然後按執行順序，逐行填寫藍色格<br>
+    • 欄位順序可不同，但名稱要正確</p>
+    <div class="legend">
+      <span style="background:#fff3cd;border:1px dashed #c0392b;">黃色 = 欄位標題</span>
+      <span style="background:#eef6ff;border:1px dashed #2c7be5;">藍色 = 資料格</span>
+    </div>
+    </div>
+    <div class="col"><h3>請建立完整追蹤表</h3>`;
+  html += '<table id="buildTable"><tr>';
+  const disabled = rec.submitted ? 'disabled' : '';
+  for (let c = 0; c < ex.columns.length; c++) {
+    const stuVal = (rec.headers && rec.headers[c]) || '';
+    html += `<th><input class="header" data-c="${c}" placeholder="?" value="${stuVal}" ${disabled}></th>`;
+  }
+  html += '</tr>';
+  for (let r = 0; r < ex.rows.length; r++) {
+    html += '<tr>';
+    for (let c = 0; c < ex.columns.length; c++) {
+      const stuVal = (rec.cells && rec.cells[`${r}-${c}`]) || '';
+      html += `<td><input class="cell" data-r="${r}" data-c="${c}" value="${stuVal}" ${disabled}></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</table>';
+  html += `<p class="hint">欄位數：${ex.columns.length}</p>`;
+  html += '</div></div></div>';
+  
+  html += `<div style="margin-top:14px;">`;
+  if (!rec.submitted) {
+    html += `<button onclick="submitMode2()">🔒 提交（只有一次機會）</button>
+             <button class="secondary" onclick="confirmReset()">清空重填</button>`;
+  } else {
+    html += `<button disabled>🔒 已提交，不能再改</button>
+             <button class="danger" onclick="confirmReset()">⚠️ 重新開始（會記錄）</button>`;
+    if (!rec.revealed) {
+      html += `<button class="reveal" onclick="revealMode2()">🔍 查看正確答案</button>`;
+    }
+  }
+  html += shareButtonsHTML();
+  html += `<div id="fb2" class="feedback"></div></div>`;
+  content.innerHTML = html;
+}
+
+window.submitMode2 = function() {
+  const headerInputs = document.querySelectorAll('#buildTable input.header');
+  const cellInputs = document.querySelectorAll('#buildTable input.cell');
+  
+  // 必須全部欄位標題填滿（資料格可容許空值，因為有些例子有空白）
+  for (const inp of headerInputs) {
+    if (inp.value.trim() === '') {
+      showToast('⚠️ 請先填寫所有黃色欄位標題！');
+      return;
+    }
+  }
+  // 檢查：至少每行的前幾格要有內容 (避免亂按)
+  let emptyCount = 0;
+  cellInputs.forEach(inp => { if (inp.value.trim() === '') emptyCount++; });
+  if (emptyCount > cellInputs.length * 0.5) {
+    showToast('⚠️ 太多空格未填，請先完成追蹤表！');
+    return;
+  }
+  if (!confirm('確定提交？\n提交後不能再修改答案！')) return;
+  
+  const ex = getCurrentExamples()[currentExample];
+  const rec = ensureRecord();
+  rec.headers = {};
+  rec.cells = {};
+  
+  // 對應學生欄位到正解欄位
+  const mapping = [];
+  const usedCorrectCols = new Set();
+  let headerCorrect = 0;
+  const headerTotal = headerInputs.length;
+  
+  headerInputs.forEach((inp, stuCol) => {
+    rec.headers[stuCol] = inp.value;
+    let foundIdx = -1;
+    for (let k = 0; k < ex.columns.length; k++) {
+      if (usedCorrectCols.has(k)) continue;
+      const alts = ex.columnAlts ? ex.columnAlts[k] : [];
+      if (isHeaderCorrect(inp.value, ex.columns[k], alts)) {
+        foundIdx = k; usedCorrectCols.add(k); break;
+      }
+    }
+    mapping[stuCol] = foundIdx;
+    if (foundIdx !== -1) headerCorrect++;
+  });
+  
+  // 對應資料格
+  let cellCorrect = 0;
+  const cellTotal = cellInputs.length;
+  cellInputs.forEach(inp => {
+    const r = +inp.dataset.r, stuCol = +inp.dataset.c;
+    rec.cells[`${r}-${stuCol}`] = inp.value;
+    const correctCol = mapping[stuCol];
+    if (correctCol === -1) return;
+    const ans = ex.rows[r][correctCol] || "";
+    if (isEqual(inp.value, ans)) cellCorrect++;
+  });
+  
+  rec.headerScore = headerCorrect;
+  rec.headerTotal = headerTotal;
+  rec.cellScore = cellCorrect;
+  rec.cellTotal = cellTotal;
+  rec.score = headerCorrect + cellCorrect;
+  rec.total = headerTotal + cellTotal;
+  rec.mapping = mapping;
+  rec.submitted = true;
+  rec.time = getTimeStr();
+  showToast(`✅ 已提交！分數：${rec.score}/${rec.total}`);
+  render();
+};
+
+window.revealMode2 = function() {
+  const rec = ensureRecord();
+  rec.revealed = true;
+  const ex = getCurrentExamples()[currentExample];
+  const headerInputs = document.querySelectorAll('#buildTable input.header');
+  const cellInputs = document.querySelectorAll('#buildTable input.cell');
+  const mapping = rec.mapping || [];
+  
+  headerInputs.forEach((inp, stuCol) => {
+    if (mapping[stuCol] !== -1) {
+      inp.classList.add('reveal-correct');
+    } else {
+      inp.classList.add('reveal-wrong');
+      const tag = document.createElement('div');
+      tag.style.cssText = 'font-size:0.7em;color:green;';
+      tag.textContent = '參考: ' + ex.columns.join(', ');
+      if (stuCol === 0) inp.parentNode.appendChild(tag);
+    }
+  });
+  
+  cellInputs.forEach(inp => {
+    const r = +inp.dataset.r, stuCol = +inp.dataset.c;
+    const correctCol = mapping[stuCol];
+    if (correctCol === -1) { inp.classList.add('reveal-wrong'); return; }
+    const ans = ex.rows[r][correctCol] || "";
+    if (isEqual(inp.value, ans)) inp.classList.add('reveal-correct');
+    else {
+      inp.classList.add('reveal-wrong');
+      inp.title = `正確答案：${ans}`;
+    }
+  });
+  showToast('已顯示正確答案（供學習，分數不變）');
+};
+
+/* ================ 模式三 ================ */
+function renderMode3(ex) {
+  const rec = ensureRecord();
+  if (!rec.questionResults) rec.questionResults = {};
+  
+  let html = `<div id="captureArea">${captureHeaderHTML(ex)}`;
+  // 模式三的「整體分數」= 已答對的問題數 / 總問題數
+  const totalQs = 2 + ex.questions.length;
+  let answeredCorrect = 0, answered = 0;
+  Object.values(rec.questionResults).forEach(q => { answered++; if (q.correct) answeredCorrect++; });
+  if (answered > 0) {
+    // 顯示階段性徽章
+    html += `<div class="submit-badge ${answeredCorrect===totalQs?'success':(answeredCorrect>=totalQs*0.6?'partial':'fail')}">
+      📊 進度：已答 ${answered}/${totalQs} 題 &nbsp;|&nbsp; 答對 ${answeredCorrect}/${answered} &nbsp;|&nbsp; 最近作答時間：${rec.time || '-'}
+      ${rec.resetCount>0?`<br><span style="color:#c0392b;font-weight:normal;">⚠️ 重做次數：${rec.resetCount}</span>`:''}
+    </div>`;
+  }
+  html += `<div class="row">
+    <div class="col"><h3>偽代碼</h3><pre>${ex.code}</pre>
+    <h3>完整追蹤表 (參考)</h3><table><tr>`;
+  ex.columns.forEach(c => html += `<th>${c}</th>`);
+  html += '</tr>';
+  ex.rows.forEach(row => {
+    html += '<tr>';
+    row.forEach(cell => html += `<td>${cell}</td>`);
+    html += '</tr>';
+  });
+  html += '</table></div>';
+
+  html += `<div class="col"><h3>回答以下問題 (每題只能提交一次！)</h3>`;
+  
+  // Q1: 輸出
+  html += questionBlockHTML('qOut', 'Q1. 算法的輸出是什麼？', 'out', ex.output, rec);
+  // Q2: 目的
+  html += questionBlockHTML('qPurpose', 'Q2. 算法的目的是什麼？', 'purpose', null, rec);
+  // 其他問題
+  ex.questions.forEach((qq, i) => {
+    html += questionBlockHTML('q'+i, `Q${i+3}. ${qq.q}`, 'q'+i, null, rec);
+  });
+  html += '</div></div></div>';
+  html += `<div style="margin-top:14px;">
+    <button class="danger" onclick="confirmReset()">⚠️ 重新開始所有問題（會記錄）</button>
+    ${shareButtonsHTML()}
+  </div>`;
+  content.innerHTML = html;
+}
+
+function questionBlockHTML(inputId, qText, key, ans, rec) {
+  const result = rec.questionResults[key];
+  const locked = result !== undefined;
+  const value = locked ? result.answer : '';
+  const disabled = locked ? 'disabled' : '';
+  let feedback = '';
+  if (locked) {
+    feedback = result.correct
+      ? `<span class="ok" style="margin-left:10px;">✔ 正確！ (已鎖定)</span>`
+      : `<span class="bad" style="margin-left:10px;">✘ 錯誤 (已鎖定，不能再改)</span>`;
+  }
+  let btn = '';
+  if (!locked) {
+    btn = `<button onclick="submitQ3('${key}','${inputId}')">🔒 提交此題</button>`;
+  }
+  return `<div class="q-block">
+    <b>${qText}</b><br>
+    <input type="text" id="${inputId}" value="${value}" ${disabled} placeholder="輸入答案">
+    ${btn}
+    ${feedback}
+  </div>`;
+}
+
+window.submitQ3 = function(key, inputId) {
+  const ex = getCurrentExamples()[currentExample];
+  const val = document.getElementById(inputId).value.trim();
+  if (val === '') { showToast('⚠️ 請先輸入答案才能提交！'); return; }
+  if (!confirm('確定提交此題？\n提交後不能再修改！')) return;
+  
+  const rec = ensureRecord();
+  let correct = false;
+  
+  if (key === 'out') {
+    correct = isEqual(val, ex.output);
+  } else if (key === 'purpose') {
+    const keywords = (ex.purpose.toLowerCase().match(/[\u4e00-\u9fa5a-z0-9]+/g) || []).filter(k => k.length >= 2);
+    const v = normalize(val);
+    const hits = keywords.filter(k => v.includes(k)).length;
+    correct = hits >= 2;
+  } else if (key.startsWith('q')) {
+    const i = parseInt(key.substring(1));
+    const answers = ex.questions[i].a.map(a => normalize(a));
+    const v = normalize(val);
+    correct = answers.some(a => v === a || (v.length>0 && v.includes(a)));
+  }
+  
+  rec.questionResults[key] = { answer: val, correct: correct };
+  rec.time = getTimeStr();
+  // 計算總分
+  const totalQs = 2 + ex.questions.length;
+  let answeredCorrect = 0;
+  Object.values(rec.questionResults).forEach(q => { if (q.correct) answeredCorrect++; });
+  rec.score = answeredCorrect;
+  rec.total = totalQs;
+  rec.submitted = Object.keys(rec.questionResults).length === totalQs;
+  
+  showToast(correct ? '✅ 正確！已鎖定' : '❌ 錯誤，已鎖定');
+  render();
+};
+
+/* 初始化 */
+updateDropdown();
+render();
+</script>
+
+</body>
+</html>
